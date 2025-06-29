@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 기반 과정중심 통합평가 수업 설계 도구 (입력연동 완전버전)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; scroll-behavior: smooth; }
+        .section-fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.8s; }
+        .section-fade-in.visible { opacity: 1; transform: translateY(0); }
+        .ai-tab { cursor: pointer; padding: 0.75rem 1.5rem; border-bottom: 3px solid transparent; transition: all 0.3s; }
+        .ai-tab-active { border-bottom-color: #2563eb; color: #2563eb; font-weight: 600; }
+        .ai-chat-bubble { background-color: #f3f4f6; border-radius: 20px; padding: 1.5rem; margin-top: 1rem; border-top-left-radius: 0; }
+        select:focus { outline: 2px solid #2563eb; }
+        .accordion-button { cursor:pointer; }
+        .accordion-content { max-height:0; overflow:hidden; transition:max-height 0.5s ease-out; }
+        .grasps-item strong { color: #1d4ed8; font-weight: 700; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <header class="bg-white/90 backdrop-blur-sm sticky top-0 shadow-md z-50">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div>
+                <span class="text-xs text-gray-400">(made by 장경임)</span>
+                <a href="#hero" class="text-2xl font-bold text-blue-600 ml-2">통합평가 수업 디자인</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section id="hero" class="bg-white section-fade-in">
+            <div class="container mx-auto px-6 py-16 text-center">
+                <h1 class="text-4xl font-extrabold mb-4 leading-tight">
+                    <span class="text-blue-600">과정중심 통합평가,</span> AI로 완성하세요
+                </h1>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    논술, 토의·토론, 프로젝트, 포트폴리오 등 다양한 평가 방법을 통합한 수업 설계.<br>
+                    성취기준 하나로 GRASPS 과제부터 차시별 수업 아이디어까지 한번에 해결하세요.
+                </p>
+            </div>
+        </section>
+        <section id="ai-assistant" class="py-16 section-fade-in">
+            <div class="container mx-auto px-6">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold">AI와 함께하는 과정중심 통합평가 설계</h2>
+                    <p class="mt-4 text-gray-600">성취기준과 핵심개념을 입력하면 GRASPS부터 차시별 설계까지 자동 생성됩니다.</p>
+                </div>
+                <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+                    <div class="mb-6">
+                        <label for="achievement-standard" class="block mb-2 font-semibold text-gray-700">2-1. 성취기준 입력</label>
+                        <textarea id="achievement-standard" class="w-full p-4 border rounded-lg mb-4" rows="3"
+                            placeholder="예) [9과05-04] 다양한 사례에서 작용하는 힘과 힘의 평형 관계를 설명하고, 일상생활에서 힘의 특징을 이용한 기구나 장치를 설계할 수 있다."></textarea>
+                    </div>
+                    <div class="mb-6">
+                        <label for="core-concepts" class="block mb-2 font-semibold text-gray-700">2-2. 학생이 이해해야 할 핵심 개념 (쉼표로 구분)</label>
+                        <textarea id="core-concepts" class="w-full p-4 border rounded-lg mb-6" rows="2"
+                            placeholder="예) 힘, 평형, 중력, 부력"></textarea>
+                    </div>
+                    <button id="generate-plan" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">AI 설계 생성하기</button>
+                    <div id="ai-output-container" class="mt-8 hidden"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Fade-in effect
+    document.querySelectorAll('.section-fade-in').forEach(s => setTimeout(() => s.classList.add('visible'), 100));
+
+    const genBtn = document.getElementById('generate-plan');
+    const outCont = document.getElementById('ai-output-container');
+    const achievementInput = document.getElementById('achievement-standard');
+    const conceptsInput = document.getElementById('core-concepts');
+
+    const templates = {
+        '9과01-01': {
+            goal: '주변의 일상문제(예: 미세먼지 저감, 음식물 쓰레기 처리 등)를 과학적 탐구 방법으로 해결 방안을 제안한다.',
+            role: '환경문제 해결을 위한 \'청소년 과학 탐구자\'',
+            audience: '지역사회, 동료 학생, 가족',
+            situation: '실제로 학교/동네에서 발생하는 문제(예: 정수기 오염, 분리수거 미흡 등)를 발견한다.',
+            product: '탐구 계획서, 실험 기록, 문제해결 발표자료',
+            standards: '문제 발견, 탐구계획 수립, 실험·자료분석, 과학적 해결방안 도출'
+        },
+        '9과01-02': {
+            goal: '인공지능 등 첨단 과학기술이 미래 사회에 미치는 영향을 조사하여 소개한다.',
+            role: '미래사회 과학기술 리포터',
+            audience: '동료 학생, 학교 신문, 지역주민',
+            situation: '실제 우리 사회에서 나타나는 변화(예: AI 자율주행, 스마트팜 등)를 사례로 조사한다.',
+            product: 'AI/과학기술 변화 발표자료, 카드뉴스, 동영상',
+            standards: '변화 사례 조사, 과학적 영향 분석, 의사소통·발표력'
+        },
+        '9과01-03': {
+            goal: '지속가능한 삶을 위한 과학기술과 생활 실천 방안을 탐색하여 토의한다.',
+            role: '‘지속가능발전 실천단’',
+            audience: '학급 토의, 학교 행사',
+            situation: '기후위기, 자원고갈 등 실제 이슈에 대해 실천 방안 고민',
+            product: '실천 캠페인 제안서, 포스터, 행동 실천일지',
+            standards: '문제 인식, 토의·의사소통, 실천 계획 수립'
+        },
+        '9과02-01': {
+            goal: '다양한 세포를 관찰해 구조와 기능의 관계를 밝혀 설명한다.',
+            role: '세포 탐구 실험자',
+            audience: '과학 동아리, 생물 수업',
+            situation: '실제 현미경 관찰 후, 구조와 기능의 상관관계 발표',
+            product: '관찰 일지, 세포 구조 발표자료',
+            standards: '세포 구조 확인, 기능 분석, 과학적 추론력'
+        },
+        '9과02-05': {
+            goal: '지역의 생물다양성 보전 실천방안을 찾아보고 실제 적용 사례를 제안한다.',
+            role: '‘청소년 생태 보전 실천가’',
+            audience: '지역사회, 학교, 친구',
+            situation: '실제 지역에서 멸종위기 생물, 생태계 파괴 사례 찾기',
+            product: '보전 방안 제안서, 실천 인증 사진, 활동 보고서',
+            standards: '자료조사, 문제해결, 실천, 결과 피드백'
+        },
+        '9과03-02': {
+            goal: '전도·대류·복사의 원리를 생활 속에서 설명하고, 모형·실험으로 시각화한다.',
+            role: '열전달 모형 디자이너',
+            audience: '학급 친구, 과학관 관람객',
+            situation: '일상 생활(예: 난방, 요리, 단열 등)에서 열전달 원리를 찾아 설명',
+            product: '모형 제작, 발표자료, 원리 설명 동영상',
+            standards: '실험설계, 모형 제작, 설명·소통'
+        },
+        '9과04-03': {
+            goal: '물질의 상태 변화를 관찰하고 입자모형으로 설명한다.',
+            role: '상태변화 실험자',
+            audience: '학급, 교내 과학행사',
+            situation: '실제 실험(예: 얼음-물-수증기, 드라이아이스 등)',
+            product: '실험 보고서, 입자모형 그림/동영상',
+            standards: '상태 변화 관찰, 입자모형 표현, 결과 정리'
+        },
+        '9과05-02': {
+            goal: '다양한 힘의 특징과 작용 원리를 실험을 통해 설명한다.',
+            role: '힘 실험 디자이너',
+            audience: '학급, 과학 페스티벌',
+            situation: '여러 가지 힘 실험(용수철, 마찰력 측정 등)',
+            product: '실험결과보고서, 힘의 크기/방향 표현 자료',
+            standards: '실험설계, 데이터 해석, 과학적 설명력'
+        },
+        '9과06-02': {
+            goal: '기체의 압력-부피 관계를 실험을 통해 밝혀 설명한다.',
+            role: '기체 실험 탐구자',
+            audience: '동료 학생, 교사',
+            situation: '실제 실험(주사기, 풍선 등)',
+            product: '실험 보고서, 입자모형 설명자료',
+            standards: '실험설계, 데이터 분석, 입자모형 해석'
+        },
+        '9과07-01': {
+            goal: '태양계 천체의 특징을 정리하고 행성 유형을 분류한다.',
+            role: '천체 분류 연구자',
+            audience: '학교 천문부, 과학 수업',
+            situation: '천체 모형, 자료 조사 후 발표',
+            product: '분류표, 설명자료, 프레젠테이션',
+            standards: '자료조사, 분류 기준, 설명력'
+        },
+        '9과10-01': {
+            goal: '빛의 반사/굴절 원리를 실험/모형으로 설명하고, 물체 보는 과정을 경로로 그린다.',
+            role: '빛 실험 디자이너',
+            audience: '학급, 과학 발표회',
+            situation: '실제 실험(거울, 렌즈 등)',
+            product: '실험 기록, 빛의 경로 그림/설명',
+            standards: '실험설계, 원리 설명, 시각화'
+        },
+        '일반': { 
+            goal: `과학적 탐구 과정을 이해하고, 일상 속 현상에 대해 가설을 설정하고 실험을 통해 검증할 수 있다.`,
+            role: `당신은 '생활 속 과학 탐정'입니다.`,
+            audience: `교내 과학 동아리 온라인 매거진 독자들`,
+            situation: `'우리 주변의 작은 질문들'이라는 코너에 기고할 탐구 기사를 작성해야 합니다. (예: 어떤 색의 옷이 햇빛 아래서 가장 시원할까?) 가설을 세우고, 변인을 통제하여 실험하고, 결과를 분석하여 결론을 도출하는 전 과정을 보여주어야 합니다.`,
+            product: `탐구 동기, 가설, 실험 과정, 결과를 담은 탐구 보고서 형식의 기사`,
+            standards: `가설이 합리적인가? 변인 통제가 적절한가? 결론 도출 과정이 논리적인가? 독자가 이해하기 쉽게 작성되었는가?`
+        }
+    };
+    
+    genBtn.addEventListener('click', () => {
+        const ach = achievementInput.value.trim();
+        const conceptText = conceptsInput.value.trim();
+        if (!ach && !conceptText) {
+            outCont.innerHTML = '<div class="text-center text-red-500">성취기준 또는 핵심개념을 입력해주세요.</div>';
+            outCont.classList.remove('hidden');
+            return;
+        }
+        outCont.innerHTML = '<p class="text-center text-gray-500">AI가 수업안을 생성 중입니다...</p>';
+        outCont.classList.remove('hidden');
+        setTimeout(() => {
+            outCont.innerHTML = renderAIContent(ach, conceptText);
+            setupInteractiveElements(outCont, conceptText);
+        }, 1100);
+    });
+
+    function renderAIContent(achievement, conceptsInput) {
+        const combined = (achievement + ' ' + conceptsInput).toLowerCase();
+
+        let key = '일반';
+        const keyMap = {
+            '9과01-01': /\[9과01-01\]|과학적\s*탐구|일상생활\s*문제/,
+            '9과01-02': /\[9과01-02\]|과학\s*발전|인공지능/,
+            '9과01-03': /\[9과01-03\]|지속가능|실천\s*방안/,
+            '9과02-01': /\[9과02-01\]|세포|생명\s*활동/,
+            '9과02-05': /\[9과02-05\]|생물\s*다양성|보전/,
+            '9과03-02': /\[9과03-02\]|열전달|전도|대류|복사/,
+            '9과04-03': /\[9과04-03\]|상태\s*변화|입자\s*모형/,
+            '9과05-02': /\[9과05-02\]|중력|탄성력|마찰력|부력|힘/,
+            '9과06-02': /\[9과06-02\]|기체\s*압력|기체\s*부피/,
+            '9과07-01': /\[9과07-01\]|태양계|행성/,
+            '9과10-01': /\[9과10-01\]|빛|반사|굴절/
+        };
+
+        for (const k in keyMap) {
+            if (keyMap[k].test(combined)) {
+                key = k;
+                break;
+            }
+        }
+
+        const tmpl = templates[key] || templates['일반'];
+        
+        const mainConcept = conceptsInput.split(',')[0].trim() || '해당 개념';
+
+        const assessmentPlanHTML = [
+            { title:'논술형 평가', obj:`${mainConcept} 이해 및 실제 적용 평가`, ex:`학생이 ${conceptsInput || mainConcept}에 대한 원리 설명, 일상 적용사례 분석, 실험 결과 해석 등을 논술로 작성`, tip:`단순 개념 암기가 아니라 자신만의 언어로 논리 전개를 평가` },
+            { title:'토의·토론 평가', obj:`비판적 사고·의사소통 평가`, ex:`모둠별 ${mainConcept}을(를) 주제로 한 찬반 토론 또는 문제 해결 토의 진행, 근거 제시`, tip:`근거/자료 활용력, 경청, 협업태도 체크` },
+            { title:'프로젝트 평가', obj:`창의적 문제해결력·협업`, ex:`${mainConcept} 실험/설계 프로젝트 진행, 과정 및 결과 산출물 평가`, tip:`과정기록과 동료평가, 루브릭 활용` },
+            { title:'포트폴리오 평가', obj:`자기성찰 및 성장과정`, ex:`학습자료, 실험노트, 자기성찰문 등 포트폴리오 구성`, tip:`단순 모음이 아니라 '배운점/성장'에 초점` }
+        ].map(i => `
+            <div class="accordion-group border rounded-lg mb-3">
+                <button class="accordion-button flex justify-between items-center w-full p-4 bg-gray-100">
+                    <span class="font-semibold text-lg text-gray-700">${i.title}</span>
+                    <svg class="w-6 h-6 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div class="accordion-content bg-white p-5 border-t">
+                    <p class="font-semibold text-blue-600 mb-2">평가 목표: ${i.obj}</p>
+                    <p class="mb-2">${i.ex}</p>
+                    <p class="text-sm text-gray-500 bg-gray-50 p-2 rounded">${i.tip}</p>
+                </div>
+            </div>`).join('');
+
+        return `
+            <div class="border border-gray-200 rounded-lg">
+                <div class="flex border-b">
+                    <div data-tab="grasps" class="ai-tab ai-tab-active flex-1 text-center">GRASPS 과제</div>
+                    <div data-tab="assessment" class="ai-tab flex-1 text-center">평가 계획</div>
+                    <div data-tab="detail" class="ai-tab flex-1 text-center">차시별 수업조수</div>
+                </div>
+                <div id="content-grasps" class="p-6">
+                    <h3 class="text-2xl font-bold mb-4">GRASPS 기반 수행평가 과제</h3>
+                    <div class="space-y-4 text-lg leading-relaxed grasps-block">
+                        <p class="grasps-item"><strong>G (Goal):</strong> ${tmpl.goal}</p>
+                        <p class="grasps-item"><strong>R (Role):</strong> ${tmpl.role}</p>
+                        <p class="grasps-item"><strong>A (Audience):</strong> ${tmpl.audience}</p>
+                        <p class="grasps-item"><strong>S (Situation):</strong> ${tmpl.situation}</p>
+                        <p class="grasps-item"><strong>P (Performance/Product):</strong> ${tmpl.product}</p>
+                        <p class="grasps-item"><strong>S (Standards):</strong> ${tmpl.standards}</p>
+                    </div>
+                </div>
+                <div id="content-assessment" class="p-6 hidden">
+                    <h3 class="text-2xl font-bold mb-4">통합적 평가 계획</h3>
+                    ${assessmentPlanHTML}
+                </div>
+                <div id="content-detail" class="p-6 hidden">
+                    <h3 class="text-2xl font-bold mb-4">차시별 수업 상세화</h3>
+                    <div class="flex items-center space-x-4 mb-4">
+                        <select id="lesson-selector" class="flex-grow p-2 border rounded-lg">
+                            <option value="1-2">1-2차시</option>
+                            <option value="3-4">3-4차시</option>
+                            <option value="5-6">5-6차시</option>
+                            <option value="7-8">7-8차시</option>
+                        </select>
+                        <button id="get-lesson-idea" class="bg-green-600 text-white px-5 py-2 rounded-lg">아이디어 보기</button>
+                    </div>
+                    <div id="lesson-idea-output" class="ai-chat-bubble">차시를 선택하고 버튼을 눌러주세요.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function setupInteractiveElements(container, conceptsInput) {
+        // Tab switching
+        const tabs = container.querySelectorAll('.ai-tab');
+        const contents = {
+            grasps: container.querySelector('#content-grasps'),
+            assessment: container.querySelector('#content-assessment'),
+            detail: container.querySelector('#content-detail')
+        };
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('ai-tab-active'));
+                tab.classList.add('ai-tab-active');
+                Object.values(contents).forEach(c => c.classList.add('hidden'));
+                contents[tab.dataset.tab].classList.remove('hidden');
+            });
+        });
+
+        // Accordion
+        container.querySelectorAll('.accordion-group').forEach(group => {
+            const button = group.querySelector('.accordion-button');
+            const content = group.querySelector('.accordion-content');
+            button.addEventListener('click', () => {
+                const isActive = group.classList.contains('accordion-active');
+                container.querySelectorAll('.accordion-group').forEach(g => {
+                    g.classList.remove('accordion-active');
+                    g.querySelector('.accordion-content').style.maxHeight = null;
+                    g.querySelector('svg').style.transform = 'rotate(0deg)';
+                });
+                if (!isActive) {
+                    group.classList.add('accordion-active');
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    button.querySelector('svg').style.transform = 'rotate(180deg)';
+                }
+            });
+        });
+
+        // Lesson Detail Assistant
+        const lessonSelector = container.querySelector('#lesson-selector');
+        const getIdeaBtn = container.querySelector('#get-lesson-idea');
+        const ideaOutput = container.querySelector('#lesson-idea-output');
+        const conceptArr = conceptsInput.split(',').map(s=>s.trim()).filter(Boolean);
+        const mainConcept = conceptArr.length ? conceptArr[0] : '해당 개념';
+        
+        const lessonIdeas = {
+            '1-2': `<b>[1-2차시]</b> 문제 탐색 및 동기유발<br>- ${mainConcept} 또는 관련 영상/사례 제시, 궁금한 점 브레인스토밍<br>산출물: 질문리스트, 마인드맵`,
+            '3-4': `<b>[3-4차시]</b> 핵심개념 실험·탐구<br>- ${conceptArr.map((c,i)=>`${c} 실험${i+1}`).join(', ')}(또는 자료분석), 실험 결과 해석 및 발표<br>산출물: 실험노트, 결과정리`,
+            '5-6': `<b>[5-6차시]</b> 중간 결과물 제작·동료 피드백<br>- 1차 설계안, 포스터, 피드백지 작성<br>산출물: 설계안, 동료피드백`,
+            '7-8': `<b>[7-8차시]</b> 최종 산출물 완성 및 발표<br>- 최종 실험/설계 결과 발표, 자기성찰문<br>산출물: 결과물, 발표자료, 자기성찰`
+        };
+
+        if(getIdeaBtn) {
+            getIdeaBtn.addEventListener('click', () => {
+                const selectedValue = lessonSelector.value;
+                ideaOutput.innerHTML = lessonIdeas[selectedValue] || '아이디어를 불러오는 중...';
+            });
+        }
+    }
+});
+</script>
+
+</body>
+</html>
